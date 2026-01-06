@@ -37,7 +37,7 @@ def send_ic_message():
         }
         
         target_channel_token = channel_map.get(channel_id, icinfo_token)
-        admin_channel_token = icinfoadmin_token if channel_id == 'ic-events' else spninfoadmin_token
+        admin_channel_token = icinfoadmin_token if channel_id == 'ic-events' else (spninfoadmin_token if channel_id == 'supernatural-events' else None)
         
         # Send message using existing process_info function
         asyncio.create_task(send_game_message(target_channel_token, admin_channel_token, message))
@@ -71,9 +71,9 @@ intents.message_content = True
 
 bot_token = os.getenv('TOKEN')
 spninfo_token = int(os.getenv('SPNINFO'))
-spninfoadmin_token = int(os.getenv('SPNINFOADMIN'))
+spninfoadmin_token = int(os.getenv('SPNINFOADMIN')) if os.getenv('SPNINFOADMIN') else None
 icinfo_token = int(os.getenv('ICINFO'))
-icinfoadmin_token = int(os.getenv('ICINFOADMIN'))
+icinfoadmin_token = int(os.getenv('ICINFOADMIN')) if os.getenv('ICINFOADMIN') else None
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
