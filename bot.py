@@ -8,11 +8,62 @@ import io
 import random
 import logging
 import asyncio
+from flask import Flask, request, jsonify
+import threading
 
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Flask app for API
+app = Flask(__name__)
+
+@app.route('/api/send-ic', methods=['POST'])
+def send_ic_message():
+    try:
+        data = request.json
+        command = data.get('command', 'ic-info')
+        message = data.get('message', '')
+        channel_id = data.get('channelId', '')
+        
+        logger.info(f"Received IC message: {command} to {channel_id}")
+        
+        # Map channel IDs to Discord channel tokens
+        channel_map = {
+            'ic-events': icinfo_token,
+            'supernatural-events': spninfo_token,
+            'general-ic': icinfo_token
+        }
+        
+        target_channel_token = channel_map.get(channel_id, icinfo_token)
+        admin_channel_token = icinfoadmin_token if channel_id == 'ic-events' else spninfoadmin_token
+        
+        # Send message using existing process_info function
+        asyncio.create_task(send_game_message(target_channel_token, admin_channel_token, message))
+        
+        return jsonify({'status': 'success'}), 200
+    except Exception as e:
+        logger.error(f"Error processing IC message: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+async def send_game_message(channel_token, admin_channel_token, message):
+    try:
+        channel = bot.get_channel(channel_token)
+        admin_channel = bot.get_channel(admin_channel_token) if admin_channel_token else None
+        
+        if channel:
+            await channel.send(message)
+            if admin_channel:
+                await admin_channel.send(f"**Game IC Message:**\n{message}")
+            logger.info("Successfully sent game IC message to Discord")
+        else:
+            logger.error("Channel not found")
+    except Exception as e:
+        logger.error(f"Error sending game message: {e}")
+
+def run_flask():
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
 
 intents = discord.Intents.default()
 intents.messages = True
@@ -261,4 +312,10 @@ async def dice(ctx, sides: int, number_of_dice: int = 1):
     embed.set_footer(text=f"Бросок от {ctx.author.display_name}")
     await ctx.send(embed=embed)
 
-bot.run(bot_token)
+if __name__ == "__main__":
+    # Start Flask API in a separate thread
+    flask_thread = threading.Thread(target=run_flask, daemon=True)
+    flask_thread.start()
+    
+    # Start Discord bot
+    bot.run(bot_token)
