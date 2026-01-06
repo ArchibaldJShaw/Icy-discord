@@ -19,6 +19,10 @@ logger = logging.getLogger(__name__)
 # Flask app for API
 app = Flask(__name__)
 
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({'status': 'healthy', 'bot': 'running'}), 200
+
 @app.route('/api/send-ic', methods=['POST'])
 def send_ic_message():
     try:
@@ -63,7 +67,8 @@ async def send_game_message(channel_token, admin_channel_token, message):
         logger.error(f"Error sending game message: {e}")
 
 def run_flask():
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port, debug=False)
 
 intents = discord.Intents.default()
 intents.messages = True
