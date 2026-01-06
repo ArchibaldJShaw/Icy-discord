@@ -7,6 +7,7 @@ import aiohttp
 import io
 import random
 import logging
+import asyncio
 
 load_dotenv()
 
@@ -71,7 +72,12 @@ async def spn_info(ctx, *, args=None):
 
 async def process_info(ctx, channel_token, admin_channel_token, args):
     if not args:
-        await ctx.send("Вы не предоставили сообщение.")
+        embed = discord.Embed(
+            title="❌ Ошибка",
+            description="Вы не предоставили сообщение",
+            color=0xFF0000
+        )
+        await ctx.send(embed=embed)
         return
 
     try:
@@ -79,19 +85,29 @@ async def process_info(ctx, channel_token, admin_channel_token, args):
         admin_channel = bot.get_channel(admin_channel_token) if admin_channel_token else None
 
         if not channel:
-            await ctx.send("Канал не найден.")
+            embed = discord.Embed(
+                title="❌ Ошибка",
+                description="Канал не найден",
+                color=0xFF0000
+            )
+            await ctx.send(embed=embed)
             return
 
         urls = re.findall(r'http[s]?://\S+\.(?:jpg|jpeg|png|gif)', args)
         url = urls[0] if urls else None
         content = args.replace(url, '').strip() if url else args
-        admin_content = f"{ctx.author.display_name} отправил(а): {content}"
+        admin_content = f"**{ctx.author.display_name}** отправил(а):\n{content}"
 
         if url and is_image_url(url):
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as resp:
                     if resp.status != 200:
-                        await ctx.send("Не удалось загрузить изображение.")
+                        embed = discord.Embed(
+                            title="❌ Ошибка",
+                            description="Не удалось загрузить изображение",
+                            color=0xFF0000
+                        )
+                        await ctx.send(embed=embed)
                         return
 
                     data = io.BytesIO(await resp.read())
@@ -103,11 +119,28 @@ async def process_info(ctx, channel_token, admin_channel_token, args):
             await channel.send(content)
             if admin_channel:
                 await admin_channel.send(admin_content)
-                
+        
+        # Success confirmation
+        embed = discord.Embed(
+            title="✅ Отправлено",
+            description="Ваше сообщение было успешно отправлено",
+            color=0x00FF00
+        )
+        confirmation = await ctx.send(embed=embed)
+        
+        # Delete both messages after 3 seconds
+        await asyncio.sleep(3)
         await ctx.message.delete()
+        await confirmation.delete()
+        
     except Exception as e:
         logger.error(f"Error in process_info: {e}")
-        await ctx.send("Произошла ошибка при отправке сообщения.")
+        embed = discord.Embed(
+            title="❌ Ошибка",
+            description="Произошла ошибка при отправке сообщения",
+            color=0xFF0000
+        )
+        await ctx.send(embed=embed)
 
 @bot.command(name='send_to_thread')
 async def send_to_thread(ctx, thread_id: int, *, args=None):
@@ -121,27 +154,111 @@ async def send_to_thread(ctx, thread_id: int, *, args=None):
 
 @bot.command(name='info')
 async def info(ctx):
-    response = (
-        f"`Привет, {ctx.author.display_name}!\n\n"
-        "С моей помощью вы сможете:\n"
-        "- Отправить анонимные сообщения в #события и #сверхъестественные-события используя команды !ic-info и !spn-info.\n Укажите URL изображения первым аргументом, если хотите прикрепить картинку. Так же, важно прикрепить ссылку на изображение (с окончанием .jpeg, .jpg, .png и т. п.) и не использовать в качестве хостинга дискорд или imgur.\n Вот пример правильного использования: !ic-info На обсерватории слышен вой волков. https://i.ibb.co/h2pWd66/image.png\n"
-        "- Отправить сообщение в определенный тред с URL изображения, используя команду !send_to_thread [ID треда] [сообщение].`"
+    embed = discord.Embed(
+        title="🎭 IC System Bot",
+        description="Бот для анонимных внутриигровых событий",
+        color=0x8B0000
     )
-    await ctx.send(response)
+    
+    embed.add_field(
+        name="📢 Основные команды",
+        value=(
+            "**`!ic-info`** - Отправить IC событие\n"
+            "**`!spn-info`** - Отправить сверхъестественное событие\n"
+            "**`!dice`** - Бросить кубики\n"
+            "**`!send_to_thread`** - Отправить в тред"
+        ),
+        inline=False
+    )
+    
+    embed.add_field(
+        name="🖼️ Изображения",
+        value=(
+            "Добавьте URL изображения в сообщение:\n"
+            "`!ic-info Вой волков на обсерватории https://i.ibb.co/example.png`\n"
+            "⚠️ Используйте внешние хостинги (не Discord/Imgur)"
+        ),
+        inline=False
+    )
+    
+    embed.add_field(
+        name="🎲 Кубики",
+        value="`!dice [стороны] [количество]` - от 1-10 сторон, до 20 кубиков",
+        inline=False
+    )
+    
+    embed.set_footer(text="Все команды анонимны • Ваше сообщение будет удалено")
+    await ctx.send(embed=embed)
 
 @bot.command(name='info-dice')
 async def info_dice(ctx):
-    await ctx.send("`Чтобы бросить кубы, воспользуйся командой !dice [количество сторон кубов (1-10)] [количество кубов (до 20)].`")
+    embed = discord.Embed(
+        title="🎲 Система кубиков",
+        color=0x4169E1
+    )
+    
+    embed.add_field(
+        name="Использование",
+        value="`!dice [стороны] [количество]`",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="Параметры",
+        value=(
+            "**Стороны:** 1-10\n"
+            "**Количество:** 1-20 кубиков"
+        ),
+        inline=True
+    )
+    
+    embed.add_field(
+        name="Примеры",
+        value=(
+            "`!dice 10` - один d10\n"
+            "`!dice 10 5` - пять d10\n"
+            "`!dice 6 3` - три d6"
+        ),
+        inline=True
+    )
+    
+    await ctx.send(embed=embed)
 
 @bot.command()
 async def dice(ctx, sides: int, number_of_dice: int = 1):
     if sides < 1 or sides > 10:
-        await ctx.send("```Количество сторон кубика должно быть от 1 до 10.")
+        embed = discord.Embed(
+            title="❌ Ошибка",
+            description="Количество сторон должно быть от 1 до 10",
+            color=0xFF0000
+        )
+        await ctx.send(embed=embed)
         return
+        
     if number_of_dice < 1 or number_of_dice > 20:
-        await ctx.send("```Количество кубиков должно быть от 1 до 20.")
+        embed = discord.Embed(
+            title="❌ Ошибка", 
+            description="Количество кубиков должно быть от 1 до 20",
+            color=0xFF0000
+        )
+        await ctx.send(embed=embed)
         return
+        
     results = [random.randint(1, sides) for _ in range(number_of_dice)]
-    await ctx.send(f"🎲 Результаты броска: {' '.join(map(str, results))}")
+    total = sum(results)
+    
+    embed = discord.Embed(
+        title="🎲 Результат броска",
+        color=0x00FF00
+    )
+    
+    embed.add_field(
+        name=f"{number_of_dice}d{sides}",
+        value=f"**Результаты:** {' • '.join(map(str, results))}\n**Сумма:** {total}",
+        inline=False
+    )
+    
+    embed.set_footer(text=f"Бросок от {ctx.author.display_name}")
+    await ctx.send(embed=embed)
 
 bot.run(bot_token)
