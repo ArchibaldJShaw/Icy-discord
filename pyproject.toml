@@ -1,0 +1,5 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+
+[project]
+requires-python = ">=3.11,<3.13"
